@@ -1,0 +1,1 @@
+web: eventlet -w 1 app:socketio

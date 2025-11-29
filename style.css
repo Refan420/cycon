@@ -1,0 +1,281 @@
+/* frontend/style.css */
+:root {
+  --neon: #39ff14;
+  --bg: #000;
+  --muted: #0f0f0f;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  font-family: 'Courier New', monospace;
+  background: var(--bg);
+  color: var(--neon);
+}
+
+.container {
+  max-width: 1100px;
+  margin: 18px auto;
+  padding: 16px;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 28px;
+  letter-spacing: 4px;
+}
+
+.lang-toggle button {
+  border: 1px solid var(--neon);
+  background: transparent;
+  color: var(--neon);
+  padding: 6px 8px;
+  margin-left: 6px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.lang-toggle .active {
+  background: var(--neon);
+  color: #000;
+}
+
+/* Controls container */
+.controls {
+  border: 1px solid var(--neon);
+  padding: 12px;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+
+
+
+
+.key-area {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.key-area input {
+  background: transparent;
+  border: 1px solid var(--neon);
+  color: var(--neon);
+  padding: 8px;
+  border-radius: 8px;
+  width: 240px;
+}
+
+.key-area button {
+  border: 1px solid var(--neon);
+  background: transparent;
+  color: var(--neon);
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* Key area flex */
+.key-area {
+  display: flex;
+  flex-wrap: wrap;
+  /* allow wrapping on small screens */
+  gap: 8px;
+  /* spacing between elements */
+  justify-content: center;
+  /* center items horizontally */
+  width: 100%;
+}
+
+/* Buttons & input */
+.key-area button,
+.key-area input {
+  /* grow, shrink, min-width */
+  min-width: 30%;
+  /* ensures they don’t get too small */
+  padding: 10px;
+  border: 1px solid var(--neon);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--neon);
+  text-align: center;
+  cursor: pointer;
+}
+
+/* Mobile adjustment: make them stack if really narrow */
+@media (max-width: 400px) {
+  .key-area {
+    flex-direction: column;
+    /* stack vertically on very small phones */
+  }
+
+  .key-area button,
+  .key-area input {
+    width: 100%;
+    height: 2rem;
+    /* full width */
+    min-width: unset;
+  }
+}
+
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.flip-camera-button,
+.mute-mic-button,
+.maximize-button,
+.end-call-btn,
+.btnReceiveCall,
+.btnRejectCall,
+.cpb,
+.btn-row>button {
+  background-color: transparent;
+  margin: .5rem;
+  padding: .5rem;
+  width: auto;
+  color: var(--neon);
+  border: 1px solid var(--neon);
+  border-radius: 9px;
+}
+
+.session-area .kbox {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--neon);
+  margin: 8px;
+  display: inline-block;
+}
+
+.main {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.video-col {
+  flex: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  display: none;
+}
+
+video {
+  width: 100%;
+  height: 90%;
+  background: #111;
+  border: 1px solid var(--neon);
+  border-radius: 8px;
+  max-height: auto;
+  object-fit: cover;
+}
+
+.video-col.maximized {
+  /* Maximize the video container */
+  width: 95%;
+  height: 90%;
+  position: fixed;
+  /* Fix position over everything else */
+  top: 1vh;
+  left: 1vw;
+  z-index: 1000;
+  /* Optional: Center video streams inside */
+  justify-content: center;
+  align-items: center;
+}
+
+#localVideo {
+  width: 140px;
+  height: 100px;
+  position: relative;
+  margin-left: auto;
+  margin-top: -120px;
+  border-radius: 8px;
+  border: 2px solid var(--neon);
+}
+
+.chat-col {
+  width: 100%;
+  height: 50vh;
+  border: 1px solid var(--neon);
+  padding: 8px;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-box {
+  flex: 1;
+  overflow: auto;
+  height: 320px;
+  padding: 6px;
+  border-radius: 6px;
+  background: rgba(57, 255, 20, 0.02);
+}
+
+.chat-msg {
+  margin: 6px 0;
+  padding: 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(57, 255, 20, 0.1);
+}
+
+.chat-msg.me {
+  text-align: right;
+}
+
+.chat-input {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.chat-input input {
+  flex: 1;
+  padding: 8px;
+  background: transparent;
+  border: 1px solid var(--neon);
+  color: var(--neon);
+  border-radius: 8px;
+}
+
+.chat-input button {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--neon);
+  background: transparent;
+  color: var(--neon);
+  cursor: pointer;
+}
+
+footer {
+  margin-top: 12px;
+  color: #666;
+  font-size: 13px;
+  text-align: center;
+}
+
+.hidden {
+  display: none !important;
+}

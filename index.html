@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Cycon — Neon P2P</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+
+<body>
+  <div class="container">
+    <header>
+      <h1>CYCON</h1>
+      <div class="lang-toggle">
+        <button id="btnReload" class="btnReload"> Reload</button>
+        <button id="lang-en" class="active">EN</button>
+        <button id="lang-bn">বাংলা</button>
+      </div>
+    </header>
+
+    <section class="controls" id="controls">
+      <div class="key-area">
+        <button id="genKey">Generate Key</button>
+        <input id="keyInput" placeholder="Enter key to join" />
+        <button id="joinBtn">Connect</button>
+      </div>
+
+      <div class="session-area" id="sessionArea" hidden>
+        <div>Session Key: <span id="sessionKey" class="kbox"></span>
+          <button class="cpb" id="copyKeyBtn">Copy</button>
+        </div>
+        <div class="btn-row">
+          <button id="btnChat">Chat </button>
+          <button id="btnAudio">Audio call</button>
+          <button id="btnVideo">Video call</button>
+          <button id="btnLeave">Leave </button>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div id="callControlArea" hidden>
+        <span id="callStatusMessage">Incoming Audio Call...</span>
+        <button class="btnReceiveCall" id="btnReceiveCall">Receive</button>
+        <button class="btnRejectCall" id="btnRejectCall" style="color:red; border: 1px solid red">Reject</button>
+      </div>
+    </section>
+
+    <section class="main" id="main">
+      <div class="video-col" id="videoCol">
+        <video id="remoteVideo" autoplay playsinline></video>
+        <video id="localVideo" autoplay muted playsinline></video>
+
+        <div class="call-controls-bar" id="callControlsBar" hidden>
+          <button id="flip-camera-button" class="flip-camera-button">Flip Cam </button>
+          <button id="mute-mic-button" class="mute-mic-button">Mute Mic</button>
+          <button id="maximize-button" class="maximize-button">Maximize</button>
+          <button id="end-call-button" class="end-call-btn" style="color:red; border: 1px solid red">End Call</button>
+          <div id="callTimer"
+            style="position: absolute; top: 10px; left: 10px; color: white; background: rgba(0,0,0,0.5); padding: 5px; border-radius: 5px; font-weight: bold;"
+            hidden>
+            00:00:00
+          </div>
+        </div>
+      </div>
+
+      <div class="chat-col" id="chatCol">
+        <div class="chat-box" id="chatBox"></div>
+        <div class="chat-input">
+          <input id="chatMsg" placeholder="Type message..." />
+          <button id="sendMsg">➤</button>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <small>Black + Neon Green • No login • Encrypted P2P</small> <br>
+      <small>BD Project</small>
+    </footer>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+
+</html>
