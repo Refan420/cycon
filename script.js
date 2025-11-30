@@ -36,6 +36,7 @@ const btnChat = document.getElementById('btnChat');
 const btnAudio = document.getElementById('btnAudio');
 const btnVideo = document.getElementById('btnVideo');
 const videoCol = document.querySelector('.video-col');
+const remoteVideoContainer = document.getElementById('remoteVideoContainer'); // নতুন: ভিডিও কন্টেইনার
 const btnLeave = document.getElementById('btnLeave');
 const chatBox = document.getElementById('chatBox');
 const chatMsg = document.getElementById('chatMsg');
@@ -81,6 +82,15 @@ function showVideoArea() {
 }
 
 function hideVideoArea() {
+    // নিশ্চিত করুন ফুলস্ক্রিন থেকে বেরিয়ে আসছে
+    if (document.fullscreenElement) {
+        document.exitFullscreen();
+    }
+
+    // নিশ্চিত করুন সব ভিডিও এলিমেন্টগুলো হাইড হয়েছে
+    if (localVideo) localVideo.style.display = 'none';
+    if (remoteVideo) remoteVideo.style.display = 'none';
+
     if (videoCol) videoCol.style.display = 'none';
     if (callControlsBar) callControlsBar.hidden = true;
     if (muteMicButton) muteMicButton.hidden = true;
@@ -217,13 +227,47 @@ function handleMuteMic() {
     }
 }
 
+// *** ফুলস্ক্রিন কার্যকারিতা যোগ করা হয়েছে ***
 function handleMaximize() {
-    if (videoCol.style.display === 'flex') {
-        videoCol.classList.toggle('maximized');
-        maximizeButton.textContent = videoCol.classList.contains('maximized') ? 'Minimize' : 'Maximize';
-        appendSystem(videoCol.classList.contains('maximized') ? 'Video maximized.' : 'Video minimized.');
+    if (!remoteVideoContainer) {
+        appendSystem('Error: Video container not found.');
+        return;
     }
+
+    const isFullscreen = document.fullscreenElement;
+
+    if (isFullscreen) {
+        // ফুলস্ক্রিন থেকে বের হও
+        document.exitFullscreen();
+    } else {
+        // ফুলস্ক্রিন মোডে যাও
+        remoteVideoContainer.requestFullscreen()
+            .then(() => {
+                appendSystem('Video maximized (Fullscreen mode).');
+            })
+            .catch(err => {
+                appendSystem('Failed to enter Fullscreen mode: ' + err.message);
+                console.error('Fullscreen Error:', err);
+            });
+    }
+    
+    // CSS ক্লাস টগল করা হচ্ছে (ঐচ্ছিক, যদি কিছু অভ্যন্তরীণ স্টাইলিং দরকার হয়)
+    videoCol.classList.toggle('maximized', !isFullscreen);
+    maximizeButton.textContent = isFullscreen ? 'Maximize' : 'Minimize';
 }
+
+// ESC চাপলে বাটন টেক্সট আপডেট করার জন্য ইভেন্ট লিসেনার
+document.addEventListener('fullscreenchange', () => {
+    const isFullscreen = document.fullscreenElement;
+    maximizeButton.textContent = isFullscreen ? 'Minimize' : 'Maximize';
+    // ensure the CSS class matches the fullscreen state
+    if (isFullscreen) {
+        videoCol.classList.add('maximized');
+    } else {
+        videoCol.classList.remove('maximized');
+    }
+});
+// *** ফুলস্ক্রিন কার্যকারিতা শেষ ***
 
 if (flipCameraButton) flipCameraButton.onclick = flipCamera;
 if (muteMicButton) muteMicButton.onclick = handleMuteMic;
@@ -245,15 +289,19 @@ async function getLocalMedia(constraints) {
         localVideo.srcObject = stream;
 
         if (!constraints.video) {
+            // Audio call mode: Hide both video elements
             localVideo.style.display = 'none';
             remoteVideo.style.display = 'none';
+            
             if (muteMicButton) muteMicButton.hidden = false;
             if (endCallButton) endCallButton.hidden = false;
             if (maximizeButton) maximizeButton.hidden = true;
             if (flipCameraButton) flipCameraButton.hidden = true;
         } else {
+            // Video call mode: Show both video elements
             localVideo.style.display = 'block';
             remoteVideo.style.display = 'block';
+
             if (muteMicButton) muteMicButton.hidden = false;
             if (endCallButton) endCallButton.hidden = false;
             if (maximizeButton) maximizeButton.hidden = false;
@@ -265,7 +313,9 @@ async function getLocalMedia(constraints) {
 
         return true;
     } catch (err) {
-        alert('Media error: ' + err.message);
+        // NOTE: Changed alert() to console.error() + appendSystem() for non-alert environment
+        console.error('Media error:', err);
+        appendSystem('Media error: ' + err.message);
         hideVideoArea();
         return false;
     }
@@ -555,6 +605,7 @@ keyInput.addEventListener('input', function() {
 if (copyKeyBtn) {
     copyKeyBtn.onclick = () => {
         if (sessionKey) {
+            // Using navigator.clipboard.writeText is generally reliable in modern browsers
             navigator.clipboard.writeText(sessionKey).then(() => {
                 appendSystem('Key copied!');
             }).catch(err => console.error('Copy failed:', err));
