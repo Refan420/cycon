@@ -1,4 +1,4 @@
-// frontend/script.js - FIXED VERSION
+// frontend/script.js - FULLY CORRECTED VERSION
 
 // =================================================================
 // GLOBALS & LANGUAGE 
@@ -36,7 +36,7 @@ const btnChat = document.getElementById('btnChat');
 const btnAudio = document.getElementById('btnAudio');
 const btnVideo = document.getElementById('btnVideo');
 const videoCol = document.querySelector('.video-col');
-const remoteVideoContainer = document.getElementById('remoteVideoContainer'); // নতুন: ভিডিও কন্টেইনার
+const remoteVideoContainer = document.getElementById('remoteVideoContainer');
 const btnLeave = document.getElementById('btnLeave');
 const chatBox = document.getElementById('chatBox');
 const chatMsg = document.getElementById('chatMsg');
@@ -57,21 +57,60 @@ const callControlsBar = document.getElementById('callControlsBar');
 const callTimer = document.getElementById('callTimer');
 
 // =================================================================
-// UI & Call Control Helpers
+// UI & Call Control Helpers 
 // =================================================================
 
 function startRinging() {
     if (!callRinger) {
-        callRinger = new Audio('ringing.mp3');
-        callRinger.loop = true;
-        callRinger.play().catch(e => console.warn("Ringing failed:", e));
+        // Create classic phone ringing sound using Web Audio API
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // Create a buffer for the ringing pattern
+        const sampleRate = audioContext.sampleRate;
+        const ringDuration = 2; // 2 seconds per ring cycle
+        const buffer = audioContext.createBuffer(1, sampleRate * ringDuration, sampleRate);
+        const data = buffer.getChannelData(0);
+        
+        // Generate classic dual-tone ring (440Hz + 480Hz)
+        for (let i = 0; i < buffer.length; i++) {
+            const time = i / sampleRate;
+            
+            // Ring pattern: 1 second on, 1 second off
+            if (time < 1.0) {
+                // Mix two frequencies for classic phone ring sound
+                const tone1 = Math.sin(2 * Math.PI * 440 * time); // A4 note
+                const tone2 = Math.sin(2 * Math.PI * 480 * time); // Close to B4
+                
+                // Add vibrato effect for more realistic sound
+                const vibrato = Math.sin(2 * Math.PI * 2 * time) * 0.1;
+                
+                // Envelope for smooth attack and decay
+                const envelope = Math.sin(Math.PI * time);
+                
+                data[i] = ((tone1 + tone2) / 2) * envelope * (1 + vibrato) * 0.3;
+            } else {
+                data[i] = 0; // Silence during off period
+            }
+        }
+        
+        // Create source and connect it
+        const source = audioContext.createBufferSource();
+        source.buffer = buffer;
+        source.loop = true;
+        source.connect(audioContext.destination);
+        source.start(0);
+        
+        // Store reference for stopping later
+        callRinger = { source, audioContext };
     }
 }
 
 function stopRinging() {
     if (callRinger) {
-        callRinger.pause();
-        callRinger.currentTime = 0;
+        if (callRinger.source) {
+            callRinger.source.stop();
+            callRinger.audioContext.close();
+        }
         callRinger = null;
     }
 }
@@ -82,47 +121,52 @@ function showVideoArea() {
 }
 
 function hideVideoArea() {
-    // নিশ্চিত করুন ফুলস্ক্রিন থেকে বেরিয়ে আসছে
+    // Exit fullscreen if active
     if (document.fullscreenElement) {
-        document.exitFullscreen();
+        document.exitFullscreen().catch(e => console.warn('Exit fullscreen failed:', e));
     }
 
-    // নিশ্চিত করুন সব ভিডিও এলিমেন্টগুলো হাইড হয়েছে
+    // Hide video elements
     if (localVideo) localVideo.style.display = 'none';
     if (remoteVideo) remoteVideo.style.display = 'none';
-
-    if (videoCol) videoCol.style.display = 'none';
+    if (videoCol) {
+        videoCol.style.display = 'none';
+        videoCol.classList.remove('maximized');
+    }
+    
     if (callControlsBar) callControlsBar.hidden = true;
     if (muteMicButton) muteMicButton.hidden = true;
     if (endCallButton) endCallButton.hidden = true;
     if (maximizeButton) maximizeButton.hidden = true;
     if (flipCameraButton) flipCameraButton.hidden = true;
-    if (videoCol) videoCol.classList.remove('maximized');
 }
 
 function showCallControls(message) {
-    callStatusMessage.textContent = message;
-    callControlArea.hidden = false;
-    btnAudio.disabled = true;
-    btnVideo.disabled = true;
+    if (callStatusMessage) callStatusMessage.textContent = message;
+    if (callControlArea) callControlArea.hidden = false;
+    if (btnAudio) btnAudio.disabled = true;
+    if (btnVideo) btnVideo.disabled = true;
 }
 
 function hideCallControls() {
-    callControlArea.hidden = true;
-    btnAudio.disabled = false;
-    btnVideo.disabled = false;
+    if (callControlArea) callControlArea.hidden = true;
+    if (btnAudio) btnAudio.disabled = false;
+    if (btnVideo) btnVideo.disabled = false;
 }
 
 function startTimer() {
+    // Don't start timer if not in an active call
+    if (!currentCallType) return;
+    
     secondsElapsed = 0;
-    callTimer.hidden = false;
+    if (callTimer) callTimer.hidden = false;
 
     function updateTimer() {
         secondsElapsed++;
         const h = String(Math.floor(secondsElapsed / 3600)).padStart(2, '0');
         const m = String(Math.floor((secondsElapsed % 3600) / 60)).padStart(2, '0');
         const s = String(secondsElapsed % 60).padStart(2, '0');
-        callTimer.textContent = `${h}:${m}:${s}`;
+        if (callTimer) callTimer.textContent = `${h}:${m}:${s}`;
     }
 
     clearInterval(timerInterval);
@@ -132,17 +176,17 @@ function startTimer() {
 
 function stopTimer() {
     clearInterval(timerInterval);
-    callTimer.hidden = true;
-    callTimer.textContent = '00:00:00';
+    if (callTimer) {
+        callTimer.hidden = true;
+        callTimer.textContent = '00:00:00';
+    }
 }
 
 async function disconnectCall(sendSignal = true) {
-    if (!pc) return;
-
     stopTimer();
     stopRinging();
 
-    // Stop local tracks
+    // Stop and remove local tracks
     if (localStream) {
         localStream.getTracks().forEach(track => {
             track.stop();
@@ -151,18 +195,23 @@ async function disconnectCall(sendSignal = true) {
     }
 
     // Clear video elements
-    localVideo.srcObject = null;
-    remoteVideo.srcObject = null;
+    if (localVideo) localVideo.srcObject = null;
+    if (remoteVideo) remoteVideo.srcObject = null;
 
     currentCallType = null;
     hideVideoArea();
-    appendSystem('Call ended. Chat connection maintained.');
-    btnAudio.disabled = false;
-    btnVideo.disabled = false;
+    
+    if (btnAudio) btnAudio.disabled = false;
+    if (btnVideo) btnVideo.disabled = false;
 
+    // Send signal to peer before closing PC
     if (sendSignal && sessionKey) {
         socket.emit('end_call_signal', { key: sessionKey });
     }
+
+    // Note: We DON'T close the PeerConnection here to keep DataChannel alive
+    // Only close PC when leaving the session entirely
+    appendSystem('Call ended. Chat is still available.');
 }
 
 // =================================================================
@@ -197,7 +246,7 @@ async function flipCamera() {
         }
 
         if (audioSender && audioTrack) {
-            const wasMuted = !localStream.getAudioTracks()[0].enabled;
+            const wasMuted = localStream.getAudioTracks()[0] ? !localStream.getAudioTracks()[0].enabled : false;
             await audioSender.replaceTrack(audioTrack);
             audioTrack.enabled = !wasMuted;
         }
@@ -222,12 +271,11 @@ function handleMuteMic() {
     const audioTrack = localStream.getAudioTracks()[0];
     if (audioTrack) {
         audioTrack.enabled = !audioTrack.enabled;
-        muteMicButton.textContent = audioTrack.enabled ? 'Mute Mic' : 'Unmute Mic';
+        if (muteMicButton) muteMicButton.textContent = audioTrack.enabled ? 'Mute Mic' : 'Unmute Mic';
         appendSystem(audioTrack.enabled ? 'Microphone Unmuted.' : 'Microphone Muted.');
     }
 }
 
-// *** ফুলস্ক্রিন কার্যকারিতা যোগ করা হয়েছে ***
 function handleMaximize() {
     if (!remoteVideoContainer) {
         appendSystem('Error: Video container not found.');
@@ -237,37 +285,30 @@ function handleMaximize() {
     const isFullscreen = document.fullscreenElement;
 
     if (isFullscreen) {
-        // ফুলস্ক্রিন থেকে বের হও
-        document.exitFullscreen();
+        document.exitFullscreen().catch(err => {
+            appendSystem('Failed to exit fullscreen: ' + err.message);
+        });
     } else {
-        // ফুলস্ক্রিন মোডে যাও
-        remoteVideoContainer.requestFullscreen()
-            .then(() => {
-                appendSystem('Video maximized (Fullscreen mode).');
-            })
-            .catch(err => {
-                appendSystem('Failed to enter Fullscreen mode: ' + err.message);
-                console.error('Fullscreen Error:', err);
-            });
+        remoteVideoContainer.requestFullscreen().then(() => {
+            appendSystem('Video maximized (Fullscreen mode).');
+        }).catch(err => {
+            appendSystem('Failed to enter Fullscreen: ' + err.message);
+        });
     }
-    
-    // CSS ক্লাস টগল করা হচ্ছে (ঐচ্ছিক, যদি কিছু অভ্যন্তরীণ স্টাইলিং দরকার হয়)
-    videoCol.classList.toggle('maximized', !isFullscreen);
-    maximizeButton.textContent = isFullscreen ? 'Maximize' : 'Minimize';
 }
 
-// ESC চাপলে বাটন টেক্সট আপডেট করার জন্য ইভেন্ট লিসেনার
+// Update button text when fullscreen changes
 document.addEventListener('fullscreenchange', () => {
     const isFullscreen = document.fullscreenElement;
-    maximizeButton.textContent = isFullscreen ? 'Minimize' : 'Maximize';
-    // ensure the CSS class matches the fullscreen state
-    if (isFullscreen) {
-        videoCol.classList.add('maximized');
-    } else {
-        videoCol.classList.remove('maximized');
+    if (maximizeButton) maximizeButton.textContent = isFullscreen ? 'Minimize' : 'Maximize';
+    if (videoCol) {
+        if (isFullscreen) {
+            videoCol.classList.add('maximized');
+        } else {
+            videoCol.classList.remove('maximized');
+        }
     }
 });
-// *** ফুলস্ক্রিন কার্যকারিতা শেষ ***
 
 if (flipCameraButton) flipCameraButton.onclick = flipCamera;
 if (muteMicButton) muteMicButton.onclick = handleMuteMic;
@@ -289,19 +330,17 @@ async function getLocalMedia(constraints) {
         localVideo.srcObject = stream;
 
         if (!constraints.video) {
-            // Audio call mode: Hide both video elements
-            localVideo.style.display = 'none';
-            remoteVideo.style.display = 'none';
-            
+            // Audio call: hide videos
+            if (localVideo) localVideo.style.display = 'none';
+            if (remoteVideo) remoteVideo.style.display = 'none';
             if (muteMicButton) muteMicButton.hidden = false;
             if (endCallButton) endCallButton.hidden = false;
             if (maximizeButton) maximizeButton.hidden = true;
             if (flipCameraButton) flipCameraButton.hidden = true;
         } else {
-            // Video call mode: Show both video elements
-            localVideo.style.display = 'block';
-            remoteVideo.style.display = 'block';
-
+            // Video call: show videos
+            if (localVideo) localVideo.style.display = 'block';
+            if (remoteVideo) remoteVideo.style.display = 'block';
             if (muteMicButton) muteMicButton.hidden = false;
             if (endCallButton) endCallButton.hidden = false;
             if (maximizeButton) maximizeButton.hidden = false;
@@ -313,7 +352,6 @@ async function getLocalMedia(constraints) {
 
         return true;
     } catch (err) {
-        // NOTE: Changed alert() to console.error() + appendSystem() for non-alert environment
         console.error('Media error:', err);
         appendSystem('Media error: ' + err.message);
         hideVideoArea();
@@ -322,12 +360,43 @@ async function getLocalMedia(constraints) {
 }
 
 async function createPeerConnection(mode) {
-    pc = new RTCPeerConnection({
+    const iceServers = {
         iceServers: [
+            // STUN servers (for discovering public IP)
             { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' }
-        ]
-    });
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' },
+            
+            // TURN servers (for relaying media when direct connection fails)
+            // Free Metered TURN servers
+            {
+                urls: 'turn:a.relay.metered.ca:80',
+                username: 'openrelayproject',
+                credential: 'openrelayproject'
+            },
+            {
+                urls: 'turn:a.relay.metered.ca:80?transport=tcp',
+                username: 'openrelayproject',
+                credential: 'openrelayproject'
+            },
+            {
+                urls: 'turn:a.relay.metered.ca:443',
+                username: 'openrelayproject',
+                credential: 'openrelayproject'
+            },
+            {
+                urls: 'turn:a.relay.metered.ca:443?transport=tcp',
+                username: 'openrelayproject',
+                credential: 'openrelayproject'
+            },
+            
+            // Twilio STUN
+            { urls: 'stun:global.stun.twilio.com:3478' }
+        ],
+        iceCandidatePoolSize: 10
+    };
+
+    pc = new RTCPeerConnection(iceServers);
 
     pc.onicecandidate = e => {
         if (e.candidate) {
@@ -339,7 +408,9 @@ async function createPeerConnection(mode) {
         console.log('Received remote track:', e.track.kind);
         if (e.streams && e.streams[0]) {
             remoteVideo.srcObject = e.streams[0];
-            if (!timerInterval) {
+            
+            // Only start timer if we're in an actual call (audio or video)
+            if (!timerInterval && currentCallType && (currentCallType === 'audio' || currentCallType === 'video')) {
                 startTimer();
             }
             appendSystem('Remote stream connected.');
@@ -348,8 +419,43 @@ async function createPeerConnection(mode) {
 
     pc.oniceconnectionstatechange = () => {
         console.log('ICE Connection State:', pc.iceConnectionState);
+        appendSystem('Connection: ' + pc.iceConnectionState);
+        
         if (pc.iceConnectionState === 'failed') {
-            appendSystem('Connection failed. Please try again.');
+            appendSystem('Connection failed. Trying TURN relay...');
+            // ICE restart to try TURN servers
+            if (pc.restartIce) {
+                pc.restartIce();
+            }
+        } else if (pc.iceConnectionState === 'disconnected') {
+            appendSystem('Connection lost. Attempting to reconnect...');
+        } else if (pc.iceConnectionState === 'connected') {
+            appendSystem('Successfully connected!');
+        }
+    };
+    
+    // Log ICE candidates to see if TURN is being used
+    pc.onicecandidate = e => {
+        if (e.candidate) {
+            console.log('ICE Candidate Type:', e.candidate.type, '| Protocol:', e.candidate.protocol);
+            if (e.candidate.type === 'relay') {
+                appendSystem('Using TURN relay server (for long distance)');
+            }
+            socket.emit('ice', { key: sessionKey, candidate: e.candidate });
+        } else {
+            console.log('All ICE candidates sent');
+        }
+    };
+
+    pc.onsignalingstatechange = () => {
+        console.log('Signaling State:', pc.signalingState);
+    };
+    
+    // Monitor ICE gathering state
+    pc.onicegatheringstatechange = () => {
+        console.log('ICE Gathering State:', pc.iceGatheringState);
+        if (pc.iceGatheringState === 'complete') {
+            appendSystem('Network discovery complete.');
         }
     };
 
@@ -368,37 +474,58 @@ async function createPeerConnection(mode) {
 
 function setupDataChannel() {
     if (!dataChannel) return;
-    dataChannel.onopen = () => appendSystem('Chat ready.');
-    dataChannel.onmessage = ev => appendChat(ev.data, false);
-    dataChannel.onerror = e => console.error('Data Channel Error:', e);
-    dataChannel.onclose = () => appendSystem('Chat closed.');
+    
+    dataChannel.onopen = () => {
+        console.log('Data channel opened');
+        appendSystem('Chat ready.');
+    };
+    
+    dataChannel.onmessage = ev => {
+        appendChat(ev.data, false);
+    };
+    
+    dataChannel.onerror = e => {
+        console.error('Data Channel Error:', e);
+        appendSystem('Chat error occurred.');
+    };
+    
+    dataChannel.onclose = () => {
+        console.log('Data channel closed');
+        appendSystem('Chat closed.');
+    };
 }
 
 // =================================================================
 // SOCKET HANDLERS
 // =================================================================
 
-genKeyBtn.onclick = () => socket.emit('generate_key');
+if (genKeyBtn) {
+    genKeyBtn.onclick = () => socket.emit('generate_key');
+}
 
 socket.on('key_generated', d => {
     sessionKey = d.key;
-    sessionKeySpan.textContent = sessionKey;
-    sessionArea.hidden = false;
+    if (sessionKeySpan) sessionKeySpan.textContent = sessionKey;
+    if (sessionArea) sessionArea.hidden = false;
     socket.emit('join_key', { key: sessionKey });
 });
 
-joinBtn.onclick = () => {
-    const key = keyInput.value.trim().toUpperCase();
-    if (!key) return appendSystem('Error: Enter key');
-    sessionKey = key;
-    socket.emit('join_key', { key });
-};
+if (joinBtn) {
+    joinBtn.onclick = () => {
+        const key = keyInput.value.trim().toUpperCase();
+        if (!key) return appendSystem('Error: Enter key');
+        sessionKey = key;
+        socket.emit('join_key', { key });
+    };
+}
 
-socket.on('join_error', d => appendSystem('Join error: ' + (d.reason || 'unknown')));
+socket.on('join_error', d => {
+    appendSystem('Join error: ' + (d.reason || 'unknown'));
+});
 
 socket.on('joined', async d => {
-    sessionKeySpan.textContent = sessionKey;
-    sessionArea.hidden = false;
+    if (sessionKeySpan) sessionKeySpan.textContent = sessionKey;
+    if (sessionArea) sessionArea.hidden = false;
     appendSystem('Connected to session: ' + sessionKey);
 
     if (!pc) {
@@ -408,17 +535,21 @@ socket.on('joined', async d => {
     }
 });
 
-socket.on('peer_joined', () => appendSystem('Peer joined.'));
+socket.on('peer_joined', () => {
+    appendSystem('Peer joined.');
+});
 
 socket.on('start_call', async () => {
-    appendSystem('Initializing connection...');
-    if (pc && isCaller) {
+    appendSystem('Peer ready. Establishing data channel...');
+    if (pc && isCaller && dataChannel) {
         try {
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
             socket.emit('offer', { key: sessionKey, sdp: pc.localDescription });
+            console.log('Initial offer sent');
         } catch (e) {
             console.error('Offer creation failed:', e);
+            appendSystem('Failed to create connection offer.');
         }
     }
 });
@@ -427,14 +558,17 @@ socket.on('offer', async d => {
     if (!d.sdp || !pc) return;
     
     try {
+        console.log('Received offer, setting remote description');
         await pc.setRemoteDescription(new RTCSessionDescription(d.sdp));
         
-        // Add local tracks if we have them
+        // Add local tracks if available
         if (localStream) {
             localStream.getTracks().forEach(track => {
-                const sender = pc.getSenders().find(s => s.track && s.track.kind === track.kind);
-                if (!sender) {
+                const senders = pc.getSenders();
+                const exists = senders.find(s => s.track && s.track.kind === track.kind);
+                if (!exists) {
                     pc.addTrack(track, localStream);
+                    console.log('Added', track.kind, 'track to PC');
                 }
             });
         }
@@ -442,19 +576,24 @@ socket.on('offer', async d => {
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         socket.emit('answer', { key: sessionKey, sdp: pc.localDescription });
-        appendSystem('Answered call.');
+        console.log('Answer sent');
+        appendSystem('Connection answer sent.');
     } catch (e) {
         console.error('Error handling offer:', e);
+        appendSystem('Error processing connection offer.');
     }
 });
 
 socket.on('answer', async d => {
     if (!d.sdp || !pc) return;
+    
     try {
+        console.log('Received answer');
         await pc.setRemoteDescription(new RTCSessionDescription(d.sdp));
         appendSystem('Connection established.');
     } catch (e) {
         console.error('Error handling answer:', e);
+        appendSystem('Error processing connection answer.');
     }
 });
 
@@ -462,6 +601,7 @@ socket.on('ice', async d => {
     if (d.candidate && pc) {
         try {
             await pc.addIceCandidate(new RTCIceCandidate(d.candidate));
+            console.log('ICE candidate added');
         } catch (e) {
             console.warn('ICE candidate error:', e);
         }
@@ -469,15 +609,20 @@ socket.on('ice', async d => {
 });
 
 socket.on('peer_left', () => {
-    appendSystem('Peer left.');
+    appendSystem('Peer left the session.');
+    
+    // Clean up everything
     disconnectCall(false);
+    
     if (pc) {
         pc.close();
         pc = null;
         dataChannel = null;
     }
-    sessionArea.hidden = true;
+    
+    if (sessionArea) sessionArea.hidden = true;
     sessionKey = null;
+    isCaller = false;
 });
 
 socket.on('end_call_signal', () => {
@@ -487,9 +632,16 @@ socket.on('end_call_signal', () => {
 });
 
 socket.on('incoming_call', async d => {
+    // Check if already in a call
     if (localStream) {
         socket.emit('reject_call', { key: sessionKey, reason: 'busy' });
         return;
+    }
+    
+    // Ensure peer connection exists
+    if (!pc) {
+        isCaller = false;
+        await createPeerConnection('receiver');
     }
 
     currentCallType = d.callType;
@@ -500,7 +652,7 @@ socket.on('incoming_call', async d => {
 });
 
 socket.on('accept_call', async () => {
-    appendSystem('Call accepted. Starting...');
+    appendSystem('Call accepted. Starting media...');
     hideCallControls();
     
     const success = await getLocalMedia({ 
@@ -508,22 +660,26 @@ socket.on('accept_call', async () => {
         video: currentCallType === 'video' 
     });
     
-    if (success && localStream) {
+    if (success && localStream && pc) {
         // Add tracks to peer connection
         localStream.getTracks().forEach(track => {
             pc.addTrack(track, localStream);
+            console.log('Added', track.kind, 'track after acceptance');
         });
         
-        // Create and send offer
+        // Create and send offer with media
         try {
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
             socket.emit('offer', { key: sessionKey, sdp: pc.localDescription });
+            console.log('Media offer sent');
         } catch (e) {
-            console.error('Failed to create offer:', e);
+            console.error('Failed to create media offer:', e);
+            appendSystem('Failed to establish media connection.');
             disconnectCall(true);
         }
     } else {
+        appendSystem('Failed to access camera/microphone.');
         disconnectCall(true);
     }
 });
@@ -531,8 +687,8 @@ socket.on('accept_call', async () => {
 socket.on('reject_call', d => {
     appendSystem(`Call rejected: ${d.reason || 'No reason'}`);
     hideCallControls();
-    btnAudio.disabled = false;
-    btnVideo.disabled = false;
+    if (btnAudio) btnAudio.disabled = false;
+    if (btnVideo) btnVideo.disabled = false;
     currentCallType = null;
     stopRinging();
 });
@@ -544,25 +700,29 @@ socket.on('reject_call', d => {
 if (btnReceiveCall) {
     btnReceiveCall.onclick = async () => {
         if (!currentCallType) return;
+        
         stopRinging();
+        appendSystem('Accepting call...');
         
         const success = await getLocalMedia({
             audio: true,
             video: currentCallType === 'video'
         });
         
-        if (success && localStream) {
-            // Add tracks
+        if (success && localStream && pc) {
+            // Add tracks to peer connection
             localStream.getTracks().forEach(track => {
                 pc.addTrack(track, localStream);
+                console.log('Added', track.kind, 'track');
             });
             
             socket.emit('accept_call', { key: sessionKey });
             hideCallControls();
-            appendSystem('Accepting call...');
         } else {
             socket.emit('reject_call', { key: sessionKey, reason: 'media_failure' });
+            appendSystem('Failed to access media devices.');
             currentCallType = null;
+            hideCallControls();
         }
     };
 }
@@ -579,112 +739,172 @@ if (btnRejectCall) {
     };
 }
 
-document.getElementById('lang-en').onclick = () => switchLang('en');
-document.getElementById('lang-bn').onclick = () => switchLang('bn');
+// Language switching
+const langEnBtn = document.getElementById('lang-en');
+const langBnBtn = document.getElementById('lang-bn');
+
+if (langEnBtn) langEnBtn.onclick = () => switchLang('en');
+if (langBnBtn) langBnBtn.onclick = () => switchLang('bn');
 
 function switchLang(l) {
     curLang = l;
-    document.getElementById('lang-en').classList.toggle('active', l === 'en');
-    document.getElementById('lang-bn').classList.toggle('active', l === 'bn');
-    genKeyBtn.textContent = t('genKey');
-    joinBtn.textContent = t('connect');
-    keyInput.placeholder = t('placeholderKey');
-    btnChat.textContent = t('chat');
-    btnAudio.textContent = t('audio');
-    btnVideo.textContent = t('video');
-    btnLeave.textContent = t('leave');
+    if (langEnBtn) langEnBtn.classList.toggle('active', l === 'en');
+    if (langBnBtn) langBnBtn.classList.toggle('active', l === 'bn');
+    if (genKeyBtn) genKeyBtn.textContent = t('genKey');
+    if (joinBtn) joinBtn.textContent = t('connect');
+    if (keyInput) keyInput.placeholder = t('placeholderKey');
+    if (btnChat) btnChat.textContent = t('chat');
+    if (btnAudio) btnAudio.textContent = t('audio');
+    if (btnVideo) btnVideo.textContent = t('video');
+    if (btnLeave) btnLeave.textContent = t('leave');
 }
 switchLang('en');
 
-btnReload.onclick = () => window.location.reload();
+if (btnReload) {
+    btnReload.onclick = () => window.location.reload();
+}
 
-keyInput.addEventListener('input', function() {
-    this.value = this.value.toUpperCase();
-});
+if (keyInput) {
+    keyInput.addEventListener('input', function() {
+        this.value = this.value.toUpperCase();
+    });
+}
 
 if (copyKeyBtn) {
     copyKeyBtn.onclick = () => {
         if (sessionKey) {
-            // Using navigator.clipboard.writeText is generally reliable in modern browsers
             navigator.clipboard.writeText(sessionKey).then(() => {
-                appendSystem('Key copied!');
-            }).catch(err => console.error('Copy failed:', err));
+                appendSystem('Session key copied to clipboard!');
+            }).catch(err => {
+                console.error('Copy failed:', err);
+                appendSystem('Failed to copy key.');
+            });
         }
     };
 }
 
-btnChat.onclick = () => {
-    if (!dataChannel || dataChannel.readyState !== 'open') {
-        appendSystem('Chat not ready.');
-    } else {
-        appendSystem('Chat is active.');
-    }
-};
+if (btnChat) {
+    btnChat.onclick = () => {
+        if (!dataChannel || dataChannel.readyState !== 'open') {
+            appendSystem('Chat not ready. Establish connection first.');
+        } else {
+            appendSystem('Chat is active and ready.');
+        }
+    };
+}
 
-btnAudio.onclick = async () => {
-    if (pc && sessionKey && isCaller && !localStream) {
+if (btnAudio) {
+    btnAudio.onclick = async () => {
+        if (!pc || !sessionKey) {
+            appendSystem('Please join a session first.');
+            return;
+        }
+        
+        if (!isCaller) {
+            appendSystem('Only the host can initiate calls.');
+            return;
+        }
+        
+        if (localStream) {
+            appendSystem('Call already in progress.');
+            return;
+        }
+        
         currentCallType = 'audio';
-        appendSystem('Calling...');
+        appendSystem('Initiating audio call...');
         socket.emit('incoming_call', { key: sessionKey, callType: 'audio' });
         btnAudio.disabled = true;
         btnVideo.disabled = true;
-    } else if (localStream) {
-        appendSystem('Call already in progress.');
-    } else if (!isCaller) {
-        appendSystem('Only host can start calls.');
-    }
-};
+    };
+}
 
-btnVideo.onclick = async () => {
-    if (pc && sessionKey && isCaller && !localStream) {
+if (btnVideo) {
+    btnVideo.onclick = async () => {
+        if (!pc || !sessionKey) {
+            appendSystem('Please join a session first.');
+            return;
+        }
+        
+        if (!isCaller) {
+            appendSystem('Only the host can initiate calls.');
+            return;
+        }
+        
+        if (localStream) {
+            appendSystem('Call already in progress.');
+            return;
+        }
+        
         currentCallType = 'video';
-        appendSystem('Calling...');
+        appendSystem('Initiating video call...');
         socket.emit('incoming_call', { key: sessionKey, callType: 'video' });
         btnAudio.disabled = true;
         btnVideo.disabled = true;
-    } else if (localStream) {
-        appendSystem('Call already in progress.');
-    } else if (!isCaller) {
-        appendSystem('Only host can start calls.');
-    }
-};
+    };
+}
 
-btnLeave.onclick = () => {
-    disconnectCall(true);
-    if (pc) {
-        pc.close();
-        pc = null;
-        dataChannel = null;
-    }
-    hideVideoArea();
-    hideCallControls();
-    stopRinging();
-    stopTimer();
-    currentCallType = null;
-    
-    if (sessionKey) {
-        socket.emit('leave_key', { key: sessionKey });
-        sessionKey = null;
-        sessionArea.hidden = true;
-        appendSystem('Left session.');
-    }
-};
+if (btnLeave) {
+    btnLeave.onclick = () => {
+        // End call first
+        disconnectCall(true);
+        
+        // Then close everything
+        if (pc) {
+            pc.close();
+            pc = null;
+            dataChannel = null;
+        }
+        
+        hideVideoArea();
+        hideCallControls();
+        stopRinging();
+        stopTimer();
+        currentCallType = null;
+        isCaller = false;
+        
+        if (sessionKey) {
+            socket.emit('leave_key', { key: sessionKey });
+            sessionKey = null;
+            if (sessionArea) sessionArea.hidden = true;
+            appendSystem('Left session.');
+        }
+    };
+}
 
-sendMsg.onclick = () => {
-    const v = chatMsg.value.trim();
-    if (!v || !dataChannel) return;
-    if (dataChannel.readyState === 'open') {
-        dataChannel.send(v);
-        appendChat(v, true);
-        chatMsg.value = '';
-    } else {
-        appendSystem('Chat not ready.');
-    }
-};
+if (sendMsg) {
+    sendMsg.onclick = () => {
+        const v = chatMsg.value.trim();
+        if (!v) return;
+        
+        if (!dataChannel || dataChannel.readyState !== 'open') {
+            appendSystem('Chat not ready. Data channel is closed.');
+            return;
+        }
+        
+        try {
+            dataChannel.send(v);
+            appendChat(v, true);
+            chatMsg.value = '';
+        } catch (e) {
+            console.error('Failed to send message:', e);
+            appendSystem('Failed to send message.');
+        }
+    };
+}
 
-chatMsg.addEventListener('keydown', e => e.key === 'Enter' && sendMsg.click());
+if (chatMsg) {
+    chatMsg.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (sendMsg) sendMsg.click();
+        }
+    });
+}
 
+// UI Helper Functions
 function appendChat(text, me) {
+    if (!chatBox) return;
+    
     const div = document.createElement('div');
     div.className = 'chat-msg' + (me ? ' me' : '');
     div.textContent = (me ? t('sending') : '') + text;
@@ -693,20 +913,33 @@ function appendChat(text, me) {
 }
 
 function appendSystem(text) {
+    if (!chatBox) return;
+    
     const div = document.createElement('div');
-    div.className = 'chat-msg';
+    div.className = 'chat-msg system';
     div.style.opacity = '0.6';
-    div.textContent = text;
+    div.style.fontStyle = 'italic';
+    div.textContent = '• ' + text;
     chatBox.appendChild(div);
     chatBox.scrollTop = chatBox.scrollHeight;
+    
+    console.log('[System]', text);
 }
 
+// Cleanup on page unload
 window.addEventListener('beforeunload', () => {
     try {
+        if (localStream) {
+            localStream.getTracks().forEach(track => track.stop());
+        }
         if (sessionKey) {
-            disconnectCall(false);
             socket.emit('leave_key', { key: sessionKey });
         }
+        if (pc) {
+            pc.close();
+        }
         socket.close();
-    } catch (e) {}
+    } catch (e) {
+        console.error('Cleanup error:', e);
+    }
 });
