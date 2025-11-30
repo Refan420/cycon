@@ -49,19 +49,33 @@
     </section>
 
     <section class="main" id="main">
+      <!-- 
+        UPDATED: The video-col now contains the remote-video-wrapper.
+        This wrapper is crucial for setting relative positioning (in CSS)
+        to make the buttons absolute and overlay the video.
+      -->
       <div class="video-col" id="videoCol">
-        <video id="remoteVideo" autoplay playsinline></video>
-        <video id="localVideo" autoplay muted playsinline></video>
+        <div id="remoteVideoContainer" class="remote-video-wrapper">
 
-        <div class="call-controls-bar" id="callControlsBar" hidden>
-          <button id="flip-camera-button" class="flip-camera-button">Flip Cam </button>
-          <button id="mute-mic-button" class="mute-mic-button">Mute Mic</button>
-          <button id="maximize-button" class="maximize-button">Maximize</button>
-          <button id="end-call-button" class="end-call-btn" style="color:red; border: 1px solid red">End Call</button>
+          <!-- Remote Video fills the wrapper (100% height/width) -->
+          <video id="remoteVideo" autoplay playsinline></video>
+
+          <!-- Local Video is absolutely positioned (PIP) in the bottom right -->
+          <video id="localVideo" autoplay muted playsinline></video>
+
+          <!-- Call Timer: Positioned absolutely at the top-left -->
           <div id="callTimer"
-            style="position: absolute; top: 10px; left: 10px; color: white; background: rgba(0,0,0,0.5); padding: 5px; border-radius: 5px; font-weight: bold;"
+            style="position: absolute; top: 10px; left: 10px; color: white; background: rgba(0,0,0,0.5); padding: 5px; border-radius: 5px; font-weight: bold; z-index: 25;"
             hidden>
             00:00:00
+          </div>
+
+          <!-- Control Buttons: Now using 'call-actions-overlay' class for bottom-center absolute positioning -->
+          <div class="call-actions-overlay" id="callControlsBar" hidden>
+            <button id="flip-camera-button" class="flip-camera-button">Flip Cam </button>
+            <button id="mute-mic-button" class="mute-mic-button">Mute Mic</button>
+            <button id="maximize-button" class="maximize-button">Maximize</button>
+            <button id="end-call-button" class="end-call-btn" style="color:red; border: 1px solid red">End Call</button>
           </div>
         </div>
       </div>
