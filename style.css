@@ -63,10 +63,6 @@ h1 {
   justify-content: center;
 }
 
-
-
-
-
 .key-area {
   display: flex;
   gap: 8px;
@@ -150,12 +146,28 @@ h1 {
 .cpb,
 .btn-row>button {
   background-color: transparent;
-  margin: .5rem;
-  padding: .5rem;
+  margin: 0.5rem;
+  padding: 0.5rem;
   width: auto;
   color: var(--neon);
   border: 1px solid var(--neon);
   border-radius: 9px;
+  /* Add subtle shadow for the neon effect */
+  box-shadow: 0 0 5px var(--neon);
+  transition: all 0.2s;
+}
+
+.flip-camera-button:hover,
+.mute-mic-button:hover,
+.maximize-button:hover,
+.end-call-btn:hover,
+.btnReceiveCall:hover,
+.btnRejectCall:hover,
+.cpb:hover,
+.btn-row>button:hover {
+  background-color: var(--neon);
+  color: var(--bg);
+  box-shadow: 0 0 10px var(--neon), 0 0 20px var(--neon);
 }
 
 .session-area .kbox {
@@ -171,6 +183,8 @@ h1 {
   flex-wrap: wrap;
   gap: 12px;
   margin-top: 12px;
+  height: calc(100vh - 150px);
+  /* Calculate remaining height for the main content */
 }
 
 .video-col {
@@ -179,40 +193,84 @@ h1 {
   flex-direction: column;
   gap: 10px;
   display: none;
+  position: relative;
+  /* New: To contain the maximized state */
+  min-height: 400px;
+  /* Ensure minimum height when visible */
 }
 
-video {
+/* NEW: Wrapper for remote video and overlay controls */
+.remote-video-wrapper {
+  flex-grow: 1;
+  /* Make wrapper fill available space */
+  position: relative;
+  /* Crucial for absolute positioning of controls */
   width: 100%;
-  height: 90%;
-  background: #111;
+  height: 100%;
+  min-height: 400px;
   border: 1px solid var(--neon);
   border-radius: 8px;
-  max-height: auto;
+  background: #111;
+}
+
+#remoteVideo {
+  width: 100%;
+  height: 100%;
+  /* Fill the wrapper completely */
+  border-radius: 8px;
   object-fit: cover;
+  display: block;
+  /* Ensure it behaves like a block element */
 }
 
-.video-col.maximized {
-  /* Maximize the video container */
-  width: 95%;
-  height: 90%;
-  position: fixed;
-  /* Fix position over everything else */
-  top: 1vh;
-  left: 1vw;
-  z-index: 1000;
-  /* Optional: Center video streams inside */
-  justify-content: center;
-  align-items: center;
+/* NEW: Overlay container for call buttons */
+.call-actions-overlay {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  /* Ensure buttons are above the video */
+  display: flex;
+  gap: 10px;
+  padding: 10px 15px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.7);
+  /* Semi-transparent background for visibility */
+  border: 1px solid rgba(57, 255, 20, 0.5);
 }
 
+
+/* Local video positioning (PIP - Picture in Picture) */
 #localVideo {
   width: 140px;
   height: 100px;
-  position: relative;
-  margin-left: auto;
-  margin-top: -120px;
+  position: absolute;
+  /* Changed from relative to absolute */
+  top: 30px;
+  /* Position it above the overlay controls */
+  right: 30px;
+  /* Position to the bottom right corner */
+  z-index: 21;
+  /* Above the overlay controls */
   border-radius: 8px;
   border: 2px solid var(--neon);
+  margin: 0;
+  /* Remove unnecessary margin */
+}
+
+/* Maximized state for the entire column/wrapper */
+.video-col.maximized {
+  /* This style must be applied to the .video-col or the body/html */
+  width: 100vw;
+  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+  margin: 0;
+  padding: 0;
+  flex-direction: column;
 }
 
 .chat-col {
@@ -225,10 +283,12 @@ video {
   flex-direction: column;
 }
 
+/* ... (Rest of the chat styles remain mostly the same) */
 .chat-box {
   flex: 1;
   overflow: auto;
-  height: 320px;
+  max-height: 400px;
+  /* Set a reasonable max height */
   padding: 6px;
   border-radius: 6px;
   background: rgba(57, 255, 20, 0.02);
